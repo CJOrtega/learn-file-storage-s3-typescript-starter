@@ -6,6 +6,7 @@ import type { BunRequest } from "bun";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
 import path from "node:path";
 import { mediaTypeToExt } from "./assets";
+import { randomBytes } from "node:crypto";
 
 type Thumbnail = {
   data: ArrayBuffer;
@@ -39,6 +40,10 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   const mediaType = file.type;
   const buffer = await file.arrayBuffer();
 
+  if (mediaType !== "image/jpeg" && mediaType !== "image/png") {
+    throw new BadRequestError("Invalid file type");
+  }
+
   const videoDB = getVideo(cfg.db, videoId);
 
   if (!videoDB) {
@@ -48,7 +53,7 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   if (videoDB.userID != userID) {
     throw new UserForbiddenError("User does not have access to this video");
   }
-  const filename = `${videoId}.${mediaTypeToExt(mediaType)}`
+  const filename = `${randomBytes(32).toString("base64")}${mediaTypeToExt(mediaType)}`
   const uniquePath = path.join(cfg.assetsRoot, filename);
 
   await Bun.write(uniquePath, buffer);
