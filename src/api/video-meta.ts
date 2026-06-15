@@ -3,7 +3,7 @@ import { getBearerToken, validateJWT } from "../auth";
 import { createVideo, deleteVideo, getVideo, getVideos } from "../db/videos";
 import { respondWithJSON } from "./json";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
-import type { BunRequest } from "bun";
+import { type BunRequest } from "bun";
 
 export async function handlerVideoMetaCreate(cfg: ApiConfig, req: Request) {
   const token = getBearerToken(req.headers);
@@ -64,4 +64,38 @@ export async function handlerVideosRetrieve(cfg: ApiConfig, req: Request) {
 
   const videos = getVideos(cfg.db, userID);
   return respondWithJSON(200, videos);
+}
+
+export async function getVideoAspectRatio(filePath: string) {
+  const proc = Bun.spawn(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", filePath],
+    {
+      stderr: "pipe",
+      stdout: "pipe"
+    }
+  );
+  const stdoutText = await new Response(proc.stdout).text();
+  const stderrText = await new Response(proc.stderr).text();
+
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    throw new BadRequestError("Bad request")
+  }
+  const output = JSON.parse(stdoutText);
+  const { width, height } = output.streams[0];
+
+  if (height === Math.floor(16 * width / 9)) {
+    return "portrait";
+  }
+  else if (width === Math.floor(16 * height / 9)) {
+    return "landscape"
+  }
+  return "other";
+}
+
+export async function processVideoForFastStart(inputFilePath: string) {
+  const filePath = inputFilePath + ".processed";
+  const proc = Bun.spawn(["ffmpeg", "-i", inputFilePath, "-movflags", "faststart", "-map_metadata", "0", "-codec", "copy", "-f", "mp4", filePath]);
+
+  await proc.exited;
+  return filePath;
 }
