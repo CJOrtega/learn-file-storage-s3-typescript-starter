@@ -4,7 +4,6 @@ import { createVideo, deleteVideo, getVideo, getVideos, type Video } from "../db
 import { respondWithJSON } from "./json";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
 import { type BunRequest } from "bun";
-import { dbVideoToSignedVideo } from "./videos";
 
 export async function handlerVideoMetaCreate(cfg: ApiConfig, req: Request) {
   const token = getBearerToken(req.headers);
@@ -56,7 +55,7 @@ export async function handlerVideoGet(cfg: ApiConfig, req: BunRequest) {
     throw new NotFoundError("Couldn't find video");
   }
 
-  return respondWithJSON(200, dbVideoToSignedVideo(cfg, video));
+  return respondWithJSON(200, video);
 }
 
 export async function handlerVideosRetrieve(cfg: ApiConfig, req: Request) {
@@ -64,11 +63,8 @@ export async function handlerVideosRetrieve(cfg: ApiConfig, req: Request) {
   const userID = validateJWT(token, cfg.jwtSecret);
 
   const videos = getVideos(cfg.db, userID);
-  const response: Video[] = []
-  for (const video of videos) {
-    response.push(dbVideoToSignedVideo(cfg, video));
-  }
-  return respondWithJSON(200, response);
+
+  return respondWithJSON(200, videos);
 }
 
 export async function getVideoAspectRatio(filePath: string) {

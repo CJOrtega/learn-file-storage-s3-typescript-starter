@@ -51,7 +51,7 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
     
     await metaData.write(await Bun.file(processedPath).arrayBuffer(), {type: video.type});
 
-    videoDB.videoURL = `${aspectRatio}/${videoId}.mp4`;
+    videoDB.videoURL = `https://${cfg.s3CfDistribution}/${aspectRatio}/${videoId}.mp4`;
     updateVideo(cfg.db, videoDB);
   } finally {
     await rm(uniquePath, {force: true});
@@ -59,20 +59,6 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
       await rm(processedPath, {force:true});
     }
   }
-  return respondWithJSON(200, dbVideoToSignedVideo(cfg, videoDB));
+  return respondWithJSON(200, videoDB);
 }
 
-function generatePresignedURL(cfg: ApiConfig, key: string, expireTime: number) {
-  const signedURL = cfg.s3Client.presign(key, {
-    expiresIn: expireTime,
-  });
-  return signedURL
-}
-
-export function dbVideoToSignedVideo(cfg: ApiConfig, video: Video) {
-  if (!video.videoURL) {
-    return video;
-  }
-  video.videoURL = generatePresignedURL(cfg, video.videoURL, 1200);
-  return video;
-}
